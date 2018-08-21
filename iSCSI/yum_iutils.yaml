@@ -1,0 +1,11 @@
+-
+  hosts: db-servers
+  gather_facts: no
+  become: yes
+  become_user: root
+  
+  tasks:
+    - name: install initiator utils
+      yum:
+          name: iscsi-initiator-utils
+          state: latest

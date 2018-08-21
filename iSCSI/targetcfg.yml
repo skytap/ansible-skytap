@@ -1,0 +1,48 @@
+-
+  hosts:
+     - target2
+     - target3
+     - target4
+  remote_user: root
+  gather_facts: yes
+ 
+  vars:
+     iscsi_targets:
+        - name: target1
+        - name: target2
+        - name: target3
+     blockdevs:
+        - sdb
+        - sdc
+        - sdd
+        - sde
+     acls:
+        - iqn.1994-05.com.redhat:385e6cee8d5
+        - iqn.1994-05.com.redhat:8a1bb523ee80
+        - iqn.1994-05.com.redhat:e8416adb6267 
+
+                         
+  tasks:
+     - name: create backstores
+       shell: "targetcli /backstores/block create {{item}} /dev/{{item}}"
+       register: resp
+       with_items: "{{blockdevs}}"
+     - debug: msg="{{resp}}"
+     - name: create iqn
+       shell: "targetcli /iscsi create iqn.2018-08.local.skytap.{{ansible_hostname}}"
+       register: iqn
+     - debug: msg="{{iqn.stdout}}"
+     - name: create ACLs
+       shell: "targetcli /iscsi/iqn.2018-08.local.skytap.{{ansible_hostname}}/tpg1/acls create {{item}}"
+       register: acl_resp 
+       with_items: "{{acls}}"
+       #
+     - name: create luns
+       shell: "targetcli /iscsi/iqn.2018-08.local.skytap.{{ansible_hostname}}/tpg1/luns create /backstores/block/{{item}}"     
+       register: luns_resp
+       with_items: "{{blockdevs}}"
+     - debug: msg="{{luns_resp}}"
+     - name:  saveconfig
+       shell: "targetcli saveconfig"
+       register: scon
+     - debug: msg="{{scon}}"

@@ -1,0 +1,20 @@
+-
+  hosts: iscsi-targets
+  gather_facts: no
+  become: yes
+  become_user: root
+  
+  tasks:
+    - name: partion and mount disk
+      block: 
+      - parted:
+          device: /dev/sdb
+          number: 1
+          state: present     
+      - filesystem:
+          fstype: ext2
+          dev: /dev/sdb1
+      - name: install targetcli
+        yum:
+          name: targetcli
+          state: latest

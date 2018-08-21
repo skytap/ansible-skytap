@@ -1,0 +1,22 @@
+-
+  hosts: db-servers
+  gather_facts: no
+  become: yes
+  become_user: root
+  
+  tasks:
+    - name: open firewall
+      command: firewall-cmd --permanent --add-port=3260/tcp
+    - name: reload firewall
+      command: firewall-cmd --reload
+    - name: install initiator utils
+      template:
+          src: ../templates/iscsi.j2 
+          dest: /etc/iscsi/initiatorname.iscsi
+    - name: restart iscsi
+      systemd:
+        name: iscsi
+        state: restarted
+        daemon_reload: yes
+    - name: iscsiadm discover
+      command: iscsiadm --mode discovery --type sendtargets --portal 10.0.0.101 10.0.0.101:3260,1 iqn.2018-07.local.skytap.target1
