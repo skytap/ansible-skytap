@@ -1,0 +1,6 @@
+cfg-run-iscsi.yaml
+cleanold.yml
+def_iscsi.yml
+mkfs
+targetcfg.yml
+yum_iutils.yaml
