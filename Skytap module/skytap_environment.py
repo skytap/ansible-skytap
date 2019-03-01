@@ -5,6 +5,8 @@
 # 2019-01-23 - M.Measel - added Edit param to Modify action 
 # 2019-01-24 - M2       - added list_networks
 # 2019-01-25 - M2       - added add_tag action
+# 2019-01-29 - M2       - added listByTag action
+# 2019-01-29 - M2       - added readVM action
 
 DOCUMENTATION = '''
 ---
@@ -47,12 +49,13 @@ def main():
 		argument_spec = dict(
 			username = dict(required=True),
 			token = dict(required=True),
-			action = dict(default='create', choices=['create', 'modify', 'delete', 'read', 'list', 'list_networks', 'wait_ratelimit', 'copy', 'add_tag']),
+			action = dict(default='create', choices=['create', 'modify', 'delete', 'read', 'readVM', 'list', 'listByTag', 'list_networks', 'wait_ratelimit', 'copy', 'add_tag']),
 			template_id = dict(required=False),
 			environment_id = dict(required=False),
 			name = dict(required=False),
 			edit = dict(required=False),
 			component = dict(required=False),
+			vm_id = dict(required=False),
 			tag = dict(required=False),
 			state = dict(required=False, choices=['running', 'stopped', 'suspended', 'halted', 'reset'])
 		),
@@ -104,9 +107,23 @@ def main():
 			module.fail_json(msg="environment_id is required param when action=read")
 
 		status, result = restCall(auth, 'GET', '/v1/configurations/'+str(module.params.get('environment_id')))
+		
+	if module.params.get('action') == 'readVM':
+		if not module.params.get('vm_id'):
+			module.fail_json(msg="vm_id is required param when action=readVM")
+		if not module.params.get('environment_id'):
+			status, result = restCall(auth, 'GET', '/v1/vms/'+str(module.params.get('vm_id')))
+		else:
+			status, result = restCall(auth, 'GET', '/v2/configurations/'+str(module.params.get('environment_id'))+'/vms/'+str(module.params.get('vm_id')))
 
 	if module.params.get('action') == 'list':
 		status, result = restCall(auth, 'GET', '/v2/configurations?scope=me&count=100')
+		
+	if module.params.get('action') == 'listByTag':
+		if not module.params.get('tag'):
+			module.fail_json(msg="tag is required param when action=listByTag")
+		select_tag = module.params.get('tag')
+		status, result = restCall(auth, 'GET', '/v2/configurations?scope=company&query=name:' + select_tag + '*&tags=true' + '&count=100')
 		
 	if module.params.get('action') == 'list_networks':
 		status, result = restCall(auth, 'GET', '/v2/configurations/' +str(module.params.get('environment_id')) + '/networks')
