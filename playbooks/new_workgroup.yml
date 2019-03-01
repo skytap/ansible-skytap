@@ -1,0 +1,109 @@
+- hosts: localhost
+  connection: local
+  gather_facts: no
+#  vars_files:
+#    - group_vars/all.yml
+
+  tasks:
+        
+  - name: workgroup variables
+    include_vars:
+      file: /home/skytap/ansiblebase/group_vars/my_workgroup.yml
+      name: wrkgrp
+       
+  - name: Get project details
+    skytap_project: action=read project_id={{wrkgrp.project_id}} username={{api_user}} token={{api_token}}
+    register: p_details
+
+# if owner isn't set in the workgroup.yml then use the project owner
+    
+  - set_fact:
+      ou: "{{p_details.api_result.owner_url}}"
+      when: wrkgrp.owner is not defined
+  - set_fact:
+      ous: "{{ou.split('/')[5]}}"
+      when: ou is defined
+  - set_fact:
+      ous: "{{wrkgrp.owner}}"
+      when: wrkgrp.owner is defined
+      
+  - debug: var=wrkgrp.owner
+    
+  - name: Get mgmt network id
+    skytap_environment: action=read environment_id={{wrkgrp.management_environment}} username={{api_user}} token={{api_token}}
+    register: mgmt
+    
+  - name: Get project environments
+    skytap_project: action=list_envs project_id={{wrkgrp.project_id}} username={{api_user}} token={{api_token}}
+    register: p_envs
+
+  - name: set parent tag
+    skytap_environment: action=add_tag tag="origin-{{item.id}}" environment_id={{item.id}} username={{api_user}} token={{api_token}}
+    register: tresult
+    with_items: "{{p_envs.api_result}}"
+      
+  - name: Get networks
+    skytap_environment: action=list_networks environment_id={{item.id}} username={{api_user}} token={{api_token}}
+    with_items: "{{p_envs.api_result}}"
+    register: env_networks
+    
+  - name: save network info for configuring new networks
+    copy: 
+      content: "{{ env_networks | to_nice_json }}"
+      dest: "/home/skytap/ansiblebase/tmp/env_networks.json"
+      force: yes
+  - meta: end_play
+  
+  - name: Copy the environments
+    skytap_environment: action=copy environment_id={{item.id}} name='New {{item.name}} Workgroup' username={{api_user}} token={{api_token}}
+    with_items: "{{p_envs.api_result}}"
+    register: new_workgroup
+    
+  - name: save new envs info
+    copy: 
+      content: "{{ new_workgroup | to_nice_json }}"
+      dest: "/home/skytap/ansiblebase/tmp/new_workgroup.json"
+      force: yes
+
+  - name: Wait until ready, in case env is still copying - holds off for API rate limiting
+    skytap_environment: action=wait_ratelimit environment_id={{item.api_result.id}} username={{api_user}} token={{api_token}}
+    with_items: "{{new_workgroup.results}}"
+
+  - name: Start environments running
+    skytap_environment: action=modify environment_id={{item.api_result.id}} state=running username={{api_user}} token={{api_token}}    
+    with_items: "{{new_workgroup.results}}"
+    
+  - name: Wait until ready, in case env is still starting 
+    skytap_environment: action=wait_ratelimit environment_id={{item.api_result.id}} username={{api_user}} token={{api_token}}
+    with_items: "{{new_workgroup.results}}"
+
+
+  - name: build networks
+    shell: /home/skytap/ansiblebase/scripts/build_network_lookup.py
+    register: buildout
+        
+  - name: Connect networks
+    skytap_icnr: action=create source_net_id={{item.source}} target_net_id={{item.target}} username={{api_user}} token={{api_token}}
+    with_items: "{{buildout.stdout | from_json }}"
+    
+  - name: Connect management network
+    skytap_icnr: action=create source_net_id={{mgmt.api_result.networks[0].id}} target_net_id={{item.api_result.networks[0].id}} username={{api_user}} token={{api_token}}
+    with_items: "{{new_workgroup.results}}"
+    
+  
+  - name: Set the wrkgrp.owner
+    skytap_environment: action=modify environment_id={{item.api_result.id}} edit='owner:{{ous}}' username={{api_user}} token={{api_token}} 
+    with_items: "{{new_workgroup.results}}"
+    
+  - name: Create a new project
+    skytap_project: action=create name={{wrkgrp.new_project_name}} username={{api_user}} token={{api_token}} 
+    register: newproj
+    
+  - name: Add the new environments to the new project
+    skytap_project: action=add_env project_id={{newproj.api_result.id}} object_id={{item.api_result.id}} username={{api_user}} token={{api_token}} 
+    with_items: "{{new_workgroup.results}}"
+    
+  - name: Add the users 
+    skytap_project: action=add_users project_id={{newproj.api_result.id}} object_id={{item.id}} role={{item.role}} username={{api_user}} token={{api_token}} 
+    with_items: "{{p_details.api_result.users}}"
+ 
