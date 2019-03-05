@@ -1,0 +1,4 @@
+---
+# with skytap we will use dynamic hosts in most cases
+[ansible]
+localhost ansible_connection=local

@@ -1,0 +1,25 @@
+---
+api_user: mmeasel-proserv
+api_token: 34712378d51f9ce6c0e7937cdcf7c0861136cbd0
+
+management_environment: 38888984
+workload_id: 42061246
+# mine
+project_id: 153081
+# bills
+# project_id: 147639
+owner: 339164
+
+template_id: 813953
+environment_id: 8153468
+asset_id: 131340
+user_id: 167420
+deployment_net_id: 4364344
+web_template_id: 813921
+
+skytap_ssh_user: skytap
+
+
+
+
+
