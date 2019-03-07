@@ -1,0 +1,20 @@
+  - debug: var=skytap_dynamic_group
+
+  - name: get VM data
+    skytap_environment: action=readVM vm_id={{item}} username={{api_user}} token={{api_token}}
+    loop: "{{env_vm_ids}}"     
+    register: vms
+    
+  - add_host: 
+      name: "{{ item.api_result.interfaces[0].ip }}" 
+      groups: "selectedVMs"
+      vm_id: "{{item.api_result.id}}"
+      vm_name: "{{item.api_result.name}}"
+      vm_env: "{{skytap_dynamic_group}}"
+    loop: "{{vms.results}}"
+    
+    
+#  - debug: msg="{{item | type_debug }}"
+#    with_items: "{{env_vm_ids}}"
+#    
+#  - meta: end_play

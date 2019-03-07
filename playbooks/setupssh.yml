@@ -1,0 +1,80 @@
+- hosts: localhost
+  connection: local
+  gather_facts: no
+#  vars_files:
+#    - group_vars/all.yml
+
+  tasks:
+        
+  - name: account variables
+    include_vars:
+      file: /home/skytap/ansiblebase/group_vars/account.yml
+      name: account
+    
+  - name: Get mgmt network id
+    skytap_environment: action=read environment_id={{account.management_environment}} username={{api_user}} token={{api_token}}
+    register: mgmt_network
+    
+  - name: Get environments by project
+    skytap_project: action=list_envs username={{api_user}} token={{api_token}}
+    register: envs
+    when: account.whichEnvs == "project"
+                
+  - name: Get tagged environments     
+    skytap_environment: action=listByTag tag={{account.envtag}} username={{api_user}} token={{api_token}}
+    register: envs
+    when: account.whichEnvs == "tagged"
+    
+  - include_tasks: buildgroup.yml
+    vars:
+      skytap_dynamic_group: "{{env.name}}"
+      env_vm_ids: "{{env['vms'] | flatten | map(attribute='id') | list}}"
+    loop: "{{envs.api_result}}"
+    loop_control: 
+      loop_var: 'env'
+      
+  - hosts: selectedVMs
+    remote_user: root
+
+  tasks:
+  - meta: end_play
+
+   - name: Get networks
+    skytap_environment: action=list_networks environment_id={{item.id}} username={{api_user}} token={{api_token}}
+    with_items: "{{envs.api_result}}"
+    register: env_networks
+  
+   - name: Wait until ready, in case env is still copying - holds off for API rate limiting
+    skytap_environment: action=wait_ratelimit environment_id={{item.api_result.id}} username={{api_user}} token={{api_token}}
+    with_items: "{{new_workgroup.results}}"
+
+  - name: Start environments running
+    skytap_environment: action=modify environment_id={{item.api_result.id}} state=running username={{api_user}} token={{api_token}}    
+    with_items: "{{new_workgroup.results}}"
+    
+  - name: Wait until ready, in case env is still starting 
+    skytap_environment: action=wait_ratelimit environment_id={{item.api_result.id}} username={{api_user}} token={{api_token}}
+    with_items: "{{new_workgroup.results}}"
+
+
+  - name: Connect management network
+    skytap_icnr: action=create source_net_id={{mgmt.api_result.networks[0].id}} target_net_id={{item.api_result.networks[0].id}} username={{api_user}} token={{api_token}}
+    with_items: "{{new_workgroup.results}}"
+    
+  
+  - name: Set the wrkgrp.owner
+    skytap_environment: action=modify environment_id={{item.api_result.id}} edit='owner:{{ous}}' username={{api_user}} token={{api_token}} 
+    with_items: "{{new_workgroup.results}}"
+    
+  - name: Create a new project
+    skytap_project: action=create name={{wrkgrp.new_project_name}} username={{api_user}} token={{api_token}} 
+    register: newproj
+    
+  - name: Add the new environments to the new project
+    skytap_project: action=add_env project_id={{newproj.api_result.id}} object_id={{item.api_result.id}} username={{api_user}} token={{api_token}} 
+    with_items: "{{new_workgroup.results}}"
+    
+  - name: Add the users 
+    skytap_project: action=add_users project_id={{newproj.api_result.id}} object_id={{item.id}} role={{item.role}} username={{api_user}} token={{api_token}} 
+    with_items: "{{p_details.api_result.users}}"
+ 

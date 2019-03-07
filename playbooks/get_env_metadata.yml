@@ -1,0 +1,20 @@
+- hosts: localhost
+  connection: local
+  gather_facts: no
+
+  tasks:
+    - name: get_metadata
+      get_url: 
+        url: http://10.0.0.254/skytap
+        dest: /tmp/meta.json
+        
+    - name: load_meta_variables
+      include_vars:
+        file: /tmp/meta.json
+        name: env_meta
+    - debug:
+        msg: "=============> {{env_meta.id}}"
+    - debug:
+        msg: "=============> {{item.ip, item.hostname, item.network_id}}"
+      loop: "{{env_meta.interfaces}}"
+ 
