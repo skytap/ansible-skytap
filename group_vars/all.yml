@@ -1,6 +1,6 @@
 ---
-api_user: mmeasel-proserv
-api_token: 34712378d51f9ce6c0e7937cdcf7c0861136cbd0
+api_user: mmeasel
+api_token: 
 
 management_environment: 38888984
 workload_id: 42061246
@@ -17,7 +17,7 @@ user_id: 167420
 deployment_net_id: 4364344
 web_template_id: 813921
 
-skytap_ssh_user: skytap
+skytap_ssh_user: 
 
 
 
