@@ -25,10 +25,6 @@ sudo usermod -a -G ansible skytap
 
 ssh-keygen -t rsa -b 4096
 
-read -p "Please insert the PSTools asset in the CD Drive and then press Enter" CD
-sudo mount /dev/cdrom /media/cdrom
-mkdir ansiblebase
-cp -R /media/cdrom/* ansiblebase
 
 
 
