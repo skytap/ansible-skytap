@@ -1,6 +1,4 @@
 #!/usr/bin/python
-# Copyright (c) 2016 Ben Coleman
-# Software provided under the terms of the Apache 2.0 license http://www.apache.org/licenses/LICENSE-2.0.txt
 
 DOCUMENTATION = '''
 ---

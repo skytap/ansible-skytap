@@ -1,8 +1,8 @@
 - hosts: localhost
   connection: local
   gather_facts: no
-#  vars_files:
-#    - group_vars/all.yml
+  vars_files:
+    - group_vars/all.yml
 
   tasks:
         
@@ -50,7 +50,7 @@
   - name: save network info for configuring new networks
     copy: 
       content: "{{ env_networks | to_nice_json }}"
-      dest: "/home/skytap/ansiblebase/tmp/env_networks.json"
+      dest: "/tmp/env_networks.json"
       force: yes
   - meta: end_play
   
@@ -62,7 +62,7 @@
   - name: save new envs info
     copy: 
       content: "{{ new_workgroup | to_nice_json }}"
-      dest: "/home/skytap/ansiblebase/tmp/new_workgroup.json"
+      dest: "/tmp/new_workgroup.json"
       force: yes
 
   - name: Wait until ready, in case env is still copying - holds off for API rate limiting

@@ -1,6 +1,5 @@
 #!/usr/bin/python
-# Copyright (c) 2016 Ben Coleman
-# Software provided under the terms of the Apache 2.0 license http://www.apache.org/licenses/LICENSE-2.0.txt
+
 # 2019-01-22 - M.Measel - added add_user and add_group actions
 # 2019-01-23 - M.Measel - added list_envs, read_assets and read_templates actions
 

@@ -9,6 +9,7 @@ envlist = r['results']
 etable = {}
 
 for env in envlist:
+	print env:
 	env_id = env['_ansible_item_label']['id']
 	ttable = {}
 	for networks in env['api_result']:	

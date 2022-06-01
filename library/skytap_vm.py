@@ -1,15 +1,11 @@
 #!/usr/bin/python
 # 
-# 2019-01-23 - M.Measel - added Edit param to Modify action 
-# 2019-01-24 - M2       - added list_networks
-# 2019-01-25 - M2       - added add_tag action
-# 2019-01-29 - M2       - added listByTag action
-# 2019-01-29 - M2       - added readVM action
+# 2020-04-20 - M.Measel 
 
 DOCUMENTATION = '''
 ---
-module: skytap_environment
-short_description: Build and control Skytap cloud environments
+module: skytap_vm
+short_description: Build and control Skytap cloud vms
 '''
 
 import json
@@ -47,14 +43,19 @@ def main():
 		argument_spec = dict(
 			username = dict(required=True),
 			token = dict(required=True),
-			action = dict(default='create', choices=['create', 'modify', 'delete', 'read', 'readVM', 'list', 'listByTag', 'list_networks', 'wait_ratelimit', 'copy', 'add_tag']),
+			action = dict(default='create', choices=['create', 'modify', 'delete', 'read', 'list_interfaces', 'list_credentials', 'wait_ratelimit']),
 			template_id = dict(required=False),
 			environment_id = dict(required=False),
 			name = dict(required=False),
 			edit = dict(required=False),
 			component = dict(required=False),
-			vm_id = dict(required=False),
+			component_json = dict(required=False),
+			vm_id = dict(required=True),
 			tag = dict(required=False),
+			disk_size = dict(required=False),
+			cpu_count = dict(required=False),
+			interface_id = dict(required=False),
+			internal_port = dict(required=False),
 			state = dict(required=False, choices=['running', 'stopped', 'suspended', 'halted', 'reset'])
 		),
 		supports_check_mode=False
@@ -72,68 +73,49 @@ def main():
 
 	if module.params.get('action') == 'modify':
 		request_data = {}
-		if not module.params.get('environment_id'):
-			module.fail_json(msg="environment_id is required param when action=modify")
+		if not module.params.get('vm_id'):
+			module.fail_json(msg="vm_id is required param when action=modify")
 		if module.params.get('state'):
 			request_data['runstate'] = module.params.get('state')
 		if module.params.get('name'):
 			request_data['name'] = module.params.get('name')
-		if module.params.get('edit'):
-			edparms = module.params.get('edit')
-			obj = edparms.split(':')[0]
-			val = edparms.split(':')[1]
-			request_data[obj] = val
+		if module.params.get('cpu_count'):
+			hardware_params = '{"hardware":{"cpus":' + module.params.get('cpu_count') + '}}'	
+			request_data = json.loads(hardware_params)
+		if module.params.get('disk_size'):
+			hardware_params = '{"hardware":{"disks":{"new":[' + module.params.get('disk_size') + ']}}}'
+			request_data = json.loads(hardware_params)
+		if module.params.get('internal_port'):
+			ps_params = '{"internal_port":' + module.params.get('internal_port') + '}'
+			request_data = json.loads(ps_params)
 		if not module.params.get('component'):
-			status, result = restCall(auth, 'PUT', '/v1/configurations/'+str(module.params.get('environment_id')), data=json.dumps(request_data))
+			status, result = restCall(auth, 'PUT', '/v1/vms/'+str(module.params.get('vm_id')), data=json.dumps(request_data))
 		else:
 			component = module.params.get('component')
-			status, result = restCall(auth, 'PUT', '/v1/configurations/'+str(module.params.get('environment_id') + '/' + component), data=json.dumps(request_data))
-			
-	if module.params.get('action') == 'add_tag':
-		tag = module.params.get('tag')
-		body =  '[{"value":"' + tag + '"}]'
-		status, result = restCall(auth, 'PUT', '/v1/configurations/'+str(module.params.get('environment_id') + '/tags'), data=body)
+			request_data = json.loads(ps_params)
+			status, result = restCall(auth, 'POST', '/v2/configurations/'+str(module.params.get('environment_id'))+'/vms/'+str(module.params.get('vm_id'))+'/'+component+'/'+str(module.params.get('interface_id'))+'/services', data=json.dumps(request_data))
 		
 	if module.params.get('action') == 'delete':
-		if not module.params.get('environment_id'):
-			module.fail_json(msg="environment_id is required param when action=delete")
+		if not module.params.get('vm_id'):
+			module.fail_json(msg="vm_id is required param when action=delete")
 
-		status, result = restCall(auth, 'DELETE', '/v1/configurations/'+str(module.params.get('environment_id')))
+		status, result = restCall(auth, 'DELETE', '/v1/vms/'+str(module.params.get('vm_id')))
 
 	if module.params.get('action') == 'read':
-		if not module.params.get('environment_id'):
-			module.fail_json(msg="environment_id is required param when action=read")
-
-		status, result = restCall(auth, 'GET', '/v1/configurations/'+str(module.params.get('environment_id')))
-		
-	if module.params.get('action') == 'readVM':
 		if not module.params.get('vm_id'):
-			module.fail_json(msg="vm_id is required param when action=readVM")
+			module.fail_json(msg="vm_id is required param when action=read")
 		if not module.params.get('environment_id'):
 			status, result = restCall(auth, 'GET', '/v1/vms/'+str(module.params.get('vm_id')))
 		else:
 			status, result = restCall(auth, 'GET', '/v2/configurations/'+str(module.params.get('environment_id'))+'/vms/'+str(module.params.get('vm_id')))
-
-	if module.params.get('action') == 'list':
-		status, result = restCall(auth, 'GET', '/v2/configurations?scope=me&count=100')
 		
-	if module.params.get('action') == 'listByTag':
-		if not module.params.get('tag'):
-			module.fail_json(msg="tag is required param when action=listByTag")
-		select_tag = module.params.get('tag')
-		status, result = restCall(auth, 'GET', '/v2/configurations?scope=company&query=name:' + select_tag + '*&tags=true' + '&count=100')
+	if module.params.get('action') == 'list_interfaces':
+		status, result = restCall(auth, 'GET', '/v2/vms/' +str(module.params.get('vm_id')) + '/interfaces')
 		
-	if module.params.get('action') == 'list_networks':
-		status, result = restCall(auth, 'GET', '/v2/configurations/' +str(module.params.get('environment_id')) + '/networks')
+	
+	if module.params.get('action') == 'list_credentials':
+		status, result = restCall(auth, 'GET', '/v2/vms/' +str(module.params.get('vm_id')) + '/credentials')
 
-	if module.params.get('action') == 'copy':
-		if not module.params.get('environment_id'):
-			module.fail_json(msg="environment_id is required param when action=copy")
-		request_data = {"configuration_id": module.params.get('environment_id')}
-		if module.params.get('name'):
-			request_data['name'] = module.params.get('name')
-
-		status, result = restCall(auth, 'POST', '/v1/configurations', data=json.dumps(request_data))
 
 	if module.params.get('action') == 'wait_ratelimit':
 		if not module.params.get('environment_id'):
@@ -152,6 +134,7 @@ def main():
 	# Check results and exit
 	if status != requests.codes.ok:
 		err = "No error message given, likely connection or network failure"
+		#if result != None and result.has_key('error'): err = result['error']
 		if result != None:
 			err = result['error']
 		module.fail_json(msg="API call failed, HTTP status: "+str(status)+", error: "+err)
