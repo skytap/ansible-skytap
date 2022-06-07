@@ -5,6 +5,7 @@
 # 2019-01-25 - M2       - added add_tag action
 # 2019-01-29 - M2       - added listByTag action
 # 2019-01-29 - M2       - added readVM action
+# 2022-06-07 - M2		- fixed wait for ready bug
 
 DOCUMENTATION = '''
 ---
@@ -47,7 +48,7 @@ def main():
 		argument_spec = dict(
 			username = dict(required=True),
 			token = dict(required=True),
-			action = dict(default='create', choices=['create', 'modify', 'delete', 'read', 'readVM', 'list', 'listByTag', 'list_networks', 'wait_ratelimit', 'copy', 'add_tag']),
+			action = dict(default='create', choices=['create', 'modify', 'delete', 'read', 'readVM', 'list', 'listByTag', 'list_networks', 'wait_ready', 'copy', 'add_tag']),
 			template_id = dict(required=False),
 			environment_id = dict(required=False),
 			name = dict(required=False),
@@ -135,30 +136,49 @@ def main():
 
 		status, result = restCall(auth, 'POST', '/v1/configurations', data=json.dumps(request_data))
 
-	if module.params.get('action') == 'wait_ratelimit':
+	if module.params.get('action') == 'wait_ready':
 		if not module.params.get('environment_id'):
-			module.fail_json(msg="environment_id is required param when action=wait_ratelimit")
+			module.fail_json(msg="environment_id is required param when action=wait_ready")
 
 		tries = 0
 		status = -1
 		while True:
+			time.sleep(10)
 			status, result = restCall(auth, 'GET', '/v1/configurations/'+str(module.params.get('environment_id')))
 			tries = tries + 1
-			if (status != 423 or status != 422) or tries > 30:
-				time.sleep(5)
+			if status == 200:
+				if result['runstate'] == 'busy':
+					time.sleep(10)
+					continue
+				else:
+					break
+			if status == 423:
+				time.sleep(10)
+				continue
+			if status == 422:
+				time.sleep(10)
+				continue
+			if tries > 30:
 				break
-			time.sleep(5)
+
 
 	# Check results and exit
-	if status != requests.codes.ok:
-		err = "No error message given, likely connection or network failure"
-		if result != None:
-			err = result['error']
-		module.fail_json(msg="API call failed, HTTP status: "+str(status)+", error: "+err)
-	else:
+	if status == requests.codes.ok:
 		module.exit_json(changed=True, api_result=result, status_code=status)
+		
+	if result != None:
+		if result.has_key('error'): 
+			err = result['error']
+		else:
+			err = "No error message given, likely connection or network failure"
+	else:
+		err = result
+				
+	module.fail_json(msg="API call failed, HTTP status: "+str(status)+", error: "+err)
+		
 
 	module.exit_json(changed=False)
+
 
 if __name__ == '__main__':
 	main()

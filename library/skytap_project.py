@@ -1,6 +1,5 @@
 #!/usr/bin/python
-# Copyright (c) 2016 Ben Coleman
-# Software provided under the terms of the Apache 2.0 license http://www.apache.org/licenses/LICENSE-2.0.txt
+
 # 2019-01-22 - M.Measel - added add_user and add_group actions
 # 2019-01-23 - M.Measel - added list_envs, read_assets and read_templates actions
 
@@ -112,15 +111,22 @@ def main():
 		
 		status, result = restCall(auth, 'GET', '/v2/projects/' + str(module.params.get('project_id')) + '/' + object_type )
 		
-	# Check results and exit
-	if status != requests.codes.ok:
-		err = "No error message given, likely connection or network failure"
-		if result != None and result.has_key('error'): err = result['error']
-		module.fail_json(msg="API call failed, HTTP status: "+str(status)+", error: "+err)
-	else:
-		module.exit_json(changed=True, api_result=result, status_code=status)
+    # Check results and exit
+    if status == requests.codes.ok:
+        module.exit_json(changed=True, api_result=result, status_code=status)
+        
+	if result != None:
+       	if result.has_key('error'): 
+       		err = result['error']
+       	else:
+       		err = "No error message given, likely connection or network failure"
+     else:
+     	 err = result
+        		
+    module.fail_json(msg="API call failed, HTTP status: "+str(status)+", error: "+err)
+       	
 
-	module.exit_json(changed=False)
-
+    module.exit_json(changed=False)
+    
 if __name__ == '__main__':
 	main()
